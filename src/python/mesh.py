@@ -1,4 +1,5 @@
 import numpy as np
+from function_builders import RegionFunctionBuilder
 
 
 def build_mesh(size_x, size_y, nx, ny):
@@ -7,7 +8,30 @@ def build_mesh(size_x, size_y, nx, ny):
     xv, yv = np.meshgrid(x, y)
     points = np.vstack([xv.ravel(), yv.ravel()]).T
     connectivity_list = _build_connectivity_list(nx, ny)
-    return Mesh(nx, ny, points, connectivity_list, size_x, size_y)
+    mesh = Mesh(nx, ny, points, connectivity_list, size_x, size_y)
+
+    mu = lambda c: 1.0 / np.power(c, 2)
+    mu_f = RegionFunctionBuilder(
+        overall_value=mu(c=300.0)
+    ).set_rectangle_interval_value(
+        start_point=(60.0, 60.0),
+        end_point=(140.0, 140.0),
+        value=mu(c=250.0)
+    ).build()
+
+    eta_f = RegionFunctionBuilder(
+        overall_value=4e-3
+    ).set_rectangle_interval_value(
+        start_point=(20.0, 20.0),
+        end_point=(180.0, 180.0),
+        value=0.0
+    ).build()
+
+    mesh.add_source('source 1', (30.0, 30.0), 1.0)
+    mesh.set_mu(mu_f)
+    mesh.set_eta(eta_f)
+
+    return mesh
 
 
 def _build_connectivity_list(nx, ny):
@@ -42,6 +66,9 @@ class Mesh:
         self.size_x = size_x
         self.size_y = size_y
         self.points_in_elements = self._build_points_in_elements()
+        self._active_sources = []
+        self._sources = {}
+        self._source_at_element = {}
 
     def closest_node_id(self, desired_position):
         closest_distance = +np.inf
@@ -52,6 +79,18 @@ class Mesh:
                 closest_distance = d
                 closest_id = i
         return closest_id
+
+    def set_mu(self, mu_f):
+        self.mu = np.empty(shape=(len(self.points_in_elements),))
+        for i, points in enumerate(self.points_in_elements):
+            x, y = np.mean(points, axis=0)
+            self.mu[i] = mu_f(x, y)
+
+    def set_eta(self, mu_f):
+        self.eta = np.empty(shape=(len(self.points_in_elements),))
+        for i, points in enumerate(self.points_in_elements):
+            x, y = np.mean(points, axis=0)
+            self.eta[i] = mu_f(x, y)
 
     def add_source(self, source_name, position, value):
         closest_point_id = self.closest_node_id(position)
@@ -65,6 +104,9 @@ class Mesh:
         self._sources[source_name] = s
         self._source_at_element[eid] = s.value
         self._active_sources.append(source_name)
+
+    def source_at_element(self, eid):
+        return self._source_at_element.get(eid, 0.0)
 
     def _element_id_in_position(self, position):
         x, y = position
