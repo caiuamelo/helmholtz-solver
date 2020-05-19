@@ -11,23 +11,23 @@ def build_mesh(size_x, size_y, nx, ny):
     mesh = Mesh(nx, ny, points, connectivity_list, size_x, size_y)
 
     mu = lambda c: 1.0 / np.power(c, 2)
-    mu_f = RegionFunctionBuilder(
-        overall_value=mu(c=300.0)
-    ).set_rectangle_interval_value(
-        start_point=(60.0, 60.0),
-        end_point=(140.0, 140.0),
-        value=mu(c=250.0)
-    ).build()
+    mu_f = (
+        RegionFunctionBuilder(overall_value=mu(c=300.0))
+        .set_rectangle_interval_value(
+            start_point=(60.0, 60.0), end_point=(140.0, 140.0), value=mu(c=250.0),
+        )
+        .build()
+    )
 
-    eta_f = RegionFunctionBuilder(
-        overall_value=4e-3
-    ).set_rectangle_interval_value(
-        start_point=(20.0, 20.0),
-        end_point=(180.0, 180.0),
-        value=0.0
-    ).build()
+    eta_f = (
+        RegionFunctionBuilder(overall_value=4e-3)
+        .set_rectangle_interval_value(
+            start_point=(20.0, 20.0), end_point=(180.0, 180.0), value=0.0
+        )
+        .build()
+    )
 
-    mesh.add_source('source 1', (30.0, 30.0), 1.0)
+    mesh.add_source("source 1", (30.0, 30.0), 1.0)
     mesh.set_mu(mu_f)
     mesh.set_eta(eta_f)
 
@@ -49,7 +49,6 @@ def _build_connectivity_list(nx, ny):
 
 
 class Mesh:
-
     class Source:
         def __init__(self, name, position, closest_point_id, value):
             self.name = name
@@ -95,12 +94,7 @@ class Mesh:
     def add_source(self, source_name, position, value):
         closest_point_id = self.closest_node_id(position)
         eid = self._element_id_in_position(position)
-        s = Mesh.Source(
-            source_name,
-            position,
-            closest_point_id,
-            value,
-        )
+        s = Mesh.Source(source_name, position, closest_point_id, value,)
         self._sources[source_name] = s
         self._source_at_element[eid] = s.value
         self._active_sources.append(source_name)
@@ -118,7 +112,6 @@ class Mesh:
         assert False, f"No element found in position {position}"
 
     def _build_points_in_elements(self):
-        return np.array([
-            [self.points[pid] for pid in e]
-            for e in self.connectivity_list
-        ])
+        return np.array(
+            [[self.points[pid] for pid in e] for e in self.connectivity_list]
+        )
