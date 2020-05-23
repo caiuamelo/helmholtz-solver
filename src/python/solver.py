@@ -15,8 +15,7 @@ def solve_2d_hellmholtz(
     if callbacks is None:
         callbacks = {}
 
-    Ke, f = _prepare_linear_system(mesh, omega)
-    Ke, f = convert_complex_linear_system_to_real(Ke, f)
+    Ke, f = convert_complex_linear_system_to_real(*_prepare_linear_system(mesh, omega))
     P = extract_complex_solution(_solve_linear_system(Ke, f))
 
     dispatch_callbacks(callbacks, "on_after_solve_2d_hellmholtz", P=P, mesh=mesh)
@@ -72,23 +71,26 @@ def _build_local_Ke(element_points, omega, mu, eta):
     return K
 
 
-def _assembly(mesh, Ke_local_list):
+def _assembly_K(mesh, omega):
+    # Prepare Ke for each element, and keep their data to be used in the assembly
+    Ke_local_list = []
+    for connectivity, points, mu, eta in zip(
+        mesh.connectivity_list, mesh.points_in_elements, mesh.mu, mesh.eta
+    ):
+        Ke_local_list.append((connectivity, _build_local_Ke(points, omega, mu, eta)))
+
+    # Assembly the global matrix
     Ke_coo_i = []
     Ke_coo_j = []
     Ke_coo_data = []
-
-    def add_Ke(x, y, value):
-        nonlocal Ke_coo_i, Ke_coo_j, Ke_coo_data
-
-        Ke_coo_i.append(x)
-        Ke_coo_j.append(y)
-        Ke_coo_data.append(value)
-
     for connectivity, Ke_local in Ke_local_list:
         for k, p1 in enumerate(connectivity):
             for l, p2 in enumerate(connectivity):
-                add_Ke(p1, p2, Ke_local[k, l])
+                Ke_coo_i.append(p1)
+                Ke_coo_j.append(p2)
+                Ke_coo_data.append(Ke_local[k, l])
 
+    # Build the sparse data structure
     Ke_global = coo_matrix(
         (Ke_coo_data, (Ke_coo_i, Ke_coo_j)),
         shape=(mesh.n_points, mesh.n_points),
@@ -136,15 +138,7 @@ def _build_local_f(element_points, S_e):
     return f
 
 
-def _prepare_linear_system(mesh, omega):
-    Ke_local_list = []
-    for connectivity, points, mu, eta in zip(
-        mesh.connectivity_list, mesh.points_in_elements, mesh.mu, mesh.eta
-    ):
-        Ke_local_list.append((connectivity, _build_local_Ke(points, omega, mu, eta)))
-
-    Ke = _assembly(mesh, Ke_local_list)
-
+def _assembly_f(mesh):
     f = np.zeros(shape=(mesh.n_points, 1))
     for eid, (connectivity, points) in enumerate(
         zip(mesh.connectivity_list, mesh.points_in_elements)
@@ -152,5 +146,8 @@ def _prepare_linear_system(mesh, omega):
         f_local = _build_local_f(points, mesh.source_at_element(eid)).reshape(4, 1)
         for k, p in enumerate(connectivity):
             f[p, 0] += f_local[k, 0]
+    return f
 
-    return Ke, f
+
+def _prepare_linear_system(mesh, omega):
+    return _assembly_K(mesh, omega), _assembly_f(mesh)
