@@ -7,6 +7,8 @@ import numpy as np
 from scipy.sparse.coo import coo_matrix
 from numpy.linalg.linalg import det
 import pypardiso
+import _fwi_ls
+import globals as g
 
 
 def solve_2d_hellmholtz(
@@ -72,12 +74,14 @@ def _build_local_Ke(element_points, omega, mu, eta):
 
 
 def _assembly_K(mesh, omega):
+    build_local_Ke = g.choose_impl(_fwi_ls.build_local_Ke, _build_local_Ke)
+
     # Prepare Ke for each element, and keep their data to be used in the assembly
     Ke_local_list = []
     for connectivity, points, mu, eta in zip(
         mesh.connectivity_list, mesh.points_in_elements, mesh.mu, mesh.eta
     ):
-        Ke_local_list.append((connectivity, _build_local_Ke(points, omega, mu, eta)))
+        Ke_local_list.append((connectivity, build_local_Ke(points, omega, mu, eta)))
 
     # Assembly the global matrix
     Ke_coo_i = []
@@ -139,11 +143,13 @@ def _build_local_f(element_points, S_e):
 
 
 def _assembly_f(mesh):
+    build_local_f = g.choose_impl(_fwi_ls.build_local_f, _build_local_f)
+
     f = np.zeros(shape=(mesh.n_points, 1))
     for eid, (connectivity, points) in enumerate(
         zip(mesh.connectivity_list, mesh.points_in_elements)
     ):
-        f_local = _build_local_f(points, mesh.source_at_element(eid)).reshape(4, 1)
+        f_local = build_local_f(points, mesh.source_at_element(eid)).reshape(4, 1)
         for k, p in enumerate(connectivity):
             f[p, 0] += f_local[k, 0]
     return f

@@ -1,5 +1,7 @@
 from scipy.sparse.coo import coo_matrix
+import globals as g
 import numpy as np
+import _fwi_ls
 
 
 def _build_extended_A(A_row, A_col, A_data, n_rows, n_cols):
@@ -26,7 +28,9 @@ def _build_extended_A(A_row, A_col, A_data, n_rows, n_cols):
 
 
 def convert_complex_linear_system_to_real(A, b):
-    big_A_coo_i, big_A_coo_j, big_A_coo_data = _build_extended_A(
+    build_extended_A = g.choose_impl(_fwi_ls.build_extended_A, _build_extended_A)
+
+    big_A_coo_i, big_A_coo_j, big_A_coo_data = build_extended_A(
         A.row, A.col, A.data, A.shape[0], A.shape[1],
     )
 

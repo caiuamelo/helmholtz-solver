@@ -1,13 +1,17 @@
 import numpy as np
 from function_builders import RegionFunctionBuilder
+import globals as g
+import _fwi_ls
 
 
 def build_mesh(size_x, size_y, nx, ny):
+    build_connectivity_list = g.choose_impl(_fwi_ls.build_connectivity_list, _build_connectivity_list)
+
     x = np.linspace(0, size_x, nx + 1)
     y = np.linspace(0, size_y, ny + 1)
     xv, yv = np.meshgrid(x, y)
     points = np.vstack([xv.ravel(), yv.ravel()]).T
-    connectivity_list = _build_connectivity_list(nx, ny)
+    connectivity_list = build_connectivity_list(nx, ny)
     mesh = Mesh(nx, ny, points, connectivity_list, size_x, size_y)
 
     mu = lambda c: 1.0 / np.power(c, 2)
